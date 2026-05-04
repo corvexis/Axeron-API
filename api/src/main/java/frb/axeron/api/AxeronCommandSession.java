@@ -132,7 +132,7 @@ public class AxeronCommandSession {
 
         outThread = new Thread(() -> {
             try {
-                char[] buffer = new char[1024 * 8];
+                char[] buffer = new char[1024 * 2];
                 int bytesRead;
 
                 while ((bytesRead = bufferedReader.read(buffer)) != -1) {
@@ -150,7 +150,7 @@ public class AxeronCommandSession {
 
         errThread = new Thread(() -> {
             try {
-                char[] buffer = new char[1024 * 8];
+                char[] buffer = new char[1024 * 2];
                 int bytesRead;
 
                 while ((bytesRead = bufferedError.read(buffer)) != -1) {
@@ -216,6 +216,7 @@ public class AxeronCommandSession {
     }
 
     public synchronized void destroy() {
+        String outputForCallback = null;
         try {
             // 1. Pastikan proses dihentikan dulu (sinyal soft kill)
             if (process != null) process.destroy();
@@ -233,12 +234,17 @@ public class AxeronCommandSession {
             if (errThread != null && errThread.isAlive()) errThread.interrupt();
             if (waitThread != null && waitThread.isAlive()) waitThread.interrupt();
 
+            // 5. Get output for callback, then clear cached output to free memory
+            outputForCallback = lastOutput.get();
+            lastOutput.set(null);
+
         } catch (IOException e) {
             errorListener("destroy: " + e.getMessage());
         }
 
         if (isProcessRunning.get() && processListener != null) {
-            finishHandler.post(() -> processListener.onProcessFinished(exitCode.get(), lastOutput.get()));
+            String finalOutput = outputForCallback;
+            finishHandler.post(() -> processListener.onProcessFinished(exitCode.get(), finalOutput));
         }
 
         // 6. Cleanup referensi

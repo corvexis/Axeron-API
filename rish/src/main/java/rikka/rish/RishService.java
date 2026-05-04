@@ -82,7 +82,12 @@ public abstract class RishService {
             return -1;
         }
 
-        return host.getExitCode();
+        int exitCode = host.getExitCode();
+        // Clean up host from map if process has exited
+        if (exitCode != Integer.MAX_VALUE) {
+            HOSTS.remove(callingPid);
+        }
+        return exitCode;
     }
 
     public abstract void enforceCallingPermission(String func);

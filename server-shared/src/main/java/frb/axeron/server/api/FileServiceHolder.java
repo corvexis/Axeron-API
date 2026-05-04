@@ -245,7 +245,7 @@ public class FileServiceHolder extends IFileService.Stub {
     }
 
     private void copyFileDurable(File src, File dst) throws IOException, ErrnoException {
-        final byte[] buf = new byte[64 * 1024];
+        final byte[] buf = new byte[8192];
 
         try (FileInputStream in = new FileInputStream(src);
              FileOutputStream out = new FileOutputStream(dst)) {

@@ -113,6 +113,7 @@ public class RemoteProcess extends Process implements Parcelable {
     @Override
     public void destroy() {
         try {
+            CACHE.remove(this);
             remote.destroy();
         } catch (RemoteException e) {
             throw new RuntimeException(e);

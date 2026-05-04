@@ -57,9 +57,6 @@ public class AxeronFileService implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "linkToDeath", e);
         }
-
-        // The reference to the binder object must be hold
-        CACHE.add(this);
     }
 
     private IFileService getFS() {
@@ -81,7 +78,7 @@ public class AxeronFileService implements Parcelable {
     }
 
     protected int getDynamicBufferSize(long fileSize) {
-        return (int) Math.max(fileSize * 2 / 100, 4096);
+        return (int) Math.min(Math.max(fileSize * 2 / 100, 4096), 32768);
     }
 
     protected void dynamicWriteFile(OutputStream os, InputStream in, long size) throws IOException {
