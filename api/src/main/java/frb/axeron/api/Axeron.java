@@ -396,16 +396,14 @@ public class Axeron {
             } catch (RemoteException ignored) {
             }
             cancelHealthCheck();
+            scheduleBinderDeadListeners();
             binder = null;
             service = null;
             axeronInfo = null;
             binderReady = false;
-            RECEIVED_LISTENERS.clear();
-            DEAD_LISTENERS.clear();
             PERMISSION_LISTENERS.clear();
             MAIN_HANDLER.removeCallbacksAndMessages(null);
             AxeronNewProcess.clearCache();
-            scheduleBinderDeadListeners();
         }
     }
 
