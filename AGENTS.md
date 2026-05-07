@@ -61,6 +61,14 @@ demo-axerish → axerish
 - **Hidden APIs** — Uses Rikka's hidden API compatibility (`dev.rikka.hidden.compat`). `shell` and `runtime` use `rikka.tools.refine` plugin.
 - **No README exists** — this file is the primary instruction source.
 
+## Resource Management (Critical)
+
+- **ProcessPoolManager** (`server-shared/.../api/ProcessPoolManager.java`) — Bounded semaphore pool limits concurrent processes. Default max=20, adapts to 10 or 5 under memory pressure. Every `newProcess()` call acquires a slot; `RemoteProcessHolder` releases on `destroy()`.
+- **PipeTransferPool** (`server-shared/.../util/PipeTransferPool.java`) — Shared `ThreadPoolExecutor` (core=4, max=32) replaces per-pipe `TransferThread` spawning. All `ParcelFileDescriptorUtil.pipeFrom/pipeTo` calls use this pool.
+- **MemoryUtils** (`server-shared/.../util/MemoryUtils.java`) — Heap pressure detection (`LOW`/`MEDIUM`/`HIGH`). Used by `ProcessPoolManager.applyMemoryAdaptation()` at server startup.
+- **AxeronNewProcess.clearCache()** — Called automatically on binder death. Manually call if you need to force-clear all cached process references.
+- **Axeron health check** — Periodic binder ping every 30s. If binder dies, automatically triggers cleanup and fires `OnBinderDeadListener`.
+
 ## Package Naming
 
 Most modules follow `frb.axeron.<scope>`, but exceptions:

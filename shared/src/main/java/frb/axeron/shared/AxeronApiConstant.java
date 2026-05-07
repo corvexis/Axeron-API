@@ -1,5 +1,7 @@
 package frb.axeron.shared;
 
+import com.axora.shared.BuildConfig;
+
 public class AxeronApiConstant {
     public static class server {
 

@@ -192,6 +192,39 @@ public class Axeron {
         binderReady = true;
     }
 
+    private static volatile Handler healthCheckHandler;
+    private static Runnable healthCheckRunnable;
+    private static final long HEALTH_CHECK_INTERVAL_MS = 30_000;
+
+    private static void scheduleHealthCheck() {
+        if (healthCheckHandler == null) {
+            healthCheckHandler = new Handler(Looper.getMainLooper());
+        }
+        healthCheckHandler.removeCallbacksAndMessages(null);
+        healthCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (binder != null && !binder.pingBinder()) {
+                    Log.w(TAG, "Health check: binder is dead");
+                    binderReady = false;
+                    onBinderReceived(null, null);
+                    return;
+                }
+                if (binder != null) {
+                    healthCheckHandler.postDelayed(this, HEALTH_CHECK_INTERVAL_MS);
+                }
+            }
+        };
+        healthCheckHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_INTERVAL_MS);
+    }
+
+    private static void cancelHealthCheck() {
+        if (healthCheckHandler != null) {
+            healthCheckHandler.removeCallbacksAndMessages(null);
+            healthCheckRunnable = null;
+        }
+    }
+
     public static void addBinderReceivedListener(@NonNull OnBinderReceivedListener listener) {
         addBinderReceivedListener(listener, null);
     }
@@ -233,10 +266,11 @@ public class Axeron {
         if (binder == newBinder) return;
 
         if (newBinder == null) {
+            cancelHealthCheck();
             binder = null;
             service = null;
             axeronInfo = null;
-
+            AxeronNewProcess.clearCache();
             scheduleBinderDeadListeners();
         } else {
 //            SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
@@ -259,6 +293,8 @@ public class Axeron {
             } catch (Throwable e) {
                 Log.w("ShizukuApplication", Log.getStackTraceString(e));
             }
+
+            scheduleHealthCheck();
 
         }
     }
@@ -359,6 +395,7 @@ public class Axeron {
                 requireService().exit();
             } catch (RemoteException ignored) {
             }
+            cancelHealthCheck();
             binder = null;
             service = null;
             axeronInfo = null;
@@ -367,6 +404,7 @@ public class Axeron {
             DEAD_LISTENERS.clear();
             PERMISSION_LISTENERS.clear();
             MAIN_HANDLER.removeCallbacksAndMessages(null);
+            AxeronNewProcess.clearCache();
             scheduleBinderDeadListeners();
         }
     }

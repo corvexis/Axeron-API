@@ -123,6 +123,15 @@ public class AxeronNewProcess extends Process implements Parcelable {
         }
     }
 
+    public static void clearCache() {
+        synchronized (CACHE) {
+            for (AxeronNewProcess proc : CACHE) {
+                try { proc.remote.destroy(); } catch (Exception ignored) {}
+            }
+            CACHE.clear();
+        }
+    }
+
     @Override
     public int describeContents() {
         return 0;

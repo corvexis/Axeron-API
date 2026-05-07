@@ -15,8 +15,7 @@ public class ParcelFileDescriptorUtil {
         ParcelFileDescriptor readSide = pipe[0];
         ParcelFileDescriptor writeSide = pipe[1];
 
-        new TransferThread(inputStream, new ParcelFileDescriptor.AutoCloseOutputStream(writeSide))
-                .start();
+        PipeTransferPool.submit(new TransferRunnable(inputStream, new ParcelFileDescriptor.AutoCloseOutputStream(writeSide)));
 
         return readSide;
     }
@@ -26,21 +25,18 @@ public class ParcelFileDescriptorUtil {
         ParcelFileDescriptor readSide = pipe[0];
         ParcelFileDescriptor writeSide = pipe[1];
 
-        new TransferThread(new ParcelFileDescriptor.AutoCloseInputStream(readSide), outputStream)
-                .start();
+        PipeTransferPool.submit(new TransferRunnable(new ParcelFileDescriptor.AutoCloseInputStream(readSide), outputStream));
 
         return writeSide;
     }
 
-    public static class TransferThread extends Thread {
+    public static class TransferRunnable implements Runnable {
         final InputStream mIn;
         final OutputStream mOut;
 
-        public TransferThread(InputStream in, OutputStream out) {
-            super("ParcelFileDescriptor Transfer Thread");
+        public TransferRunnable(InputStream in, OutputStream out) {
             mIn = in;
             mOut = out;
-            setDaemon(true);
         }
 
         @Override
@@ -54,7 +50,7 @@ public class ParcelFileDescriptorUtil {
                     mOut.flush();
                 }
             } catch (IOException e) {
-                Log.e("TransferThread", Log.getStackTraceString(e));
+                Log.e("TransferRunnable", Log.getStackTraceString(e));
             } finally {
                 try {
                     mIn.close();
