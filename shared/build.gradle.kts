@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "frb.axeron.shared"
+    namespace = "com.axora.shared"
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")

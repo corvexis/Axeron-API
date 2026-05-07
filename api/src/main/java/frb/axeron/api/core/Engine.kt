@@ -45,7 +45,7 @@ open class Engine: Application() {
 
             // Buka CrashActivity
             val intent = Intent().apply {
-                setClassName(packageName, "frb.axeron.manager.ui.CrashActivity")
+                setClassName(packageName, "com.axora.box.ui.CrashActivity")
                 putExtra("error_log", errorLog)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }

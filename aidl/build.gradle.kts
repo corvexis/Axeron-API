@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "frb.axeron.aidl"
+    namespace = "com.axora.aidl"
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")

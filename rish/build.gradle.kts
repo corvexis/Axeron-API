@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "frb.axeron.rish"
+    namespace = "com.axora.rish"
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")

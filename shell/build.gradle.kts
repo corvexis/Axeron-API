@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "frb.axeron.shell"
+    namespace = "com.axora.shell"
 
     defaultConfig {
-        applicationId = "frb.axeron.shell"
+        applicationId = "com.axora.shell"
     }
 
     buildTypes {
