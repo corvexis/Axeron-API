@@ -103,7 +103,7 @@ public class AxeronCommandSession {
                 Log.d("CmdOut", "newProcess: " + input);
                 startNewProcess(input, isCompatModeEnabled);
             }
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             errorListener("command: " + e.getMessage());
         }
     }
@@ -143,7 +143,7 @@ public class AxeronCommandSession {
                         outputHandler.post(() -> resultListener.output(part));
                     }
                 }
-            } catch (IOException | NullPointerException e) {
+            } catch (IOException | RuntimeException e) {
                 errorListener("stdout: " + e.getMessage());
             }
         }, "SessionOutThread");
@@ -174,7 +174,7 @@ public class AxeronCommandSession {
                     }
 
                 }
-            } catch (IOException | NullPointerException e) {
+            } catch (IOException | RuntimeException e) {
                 errorListener("stderr: " + e.getMessage());
             }
         }, "SessionErrThread");
@@ -188,7 +188,7 @@ public class AxeronCommandSession {
                 exitCode.set(code);
 
                 Log.d("CommandSession", "Process selesai, exitCode = " + exitCode);
-            } catch (InterruptedException | NullPointerException ignored) {
+            } catch (InterruptedException | RuntimeException ignored) {
             } finally {
                 destroy();
             }
@@ -238,13 +238,14 @@ public class AxeronCommandSession {
             outputForCallback = lastOutput.get();
             lastOutput.set(null);
 
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             errorListener("destroy: " + e.getMessage());
         }
 
         if (isProcessRunning.get() && processListener != null) {
-            String finalOutput = outputForCallback;
-            finishHandler.post(() -> processListener.onProcessFinished(exitCode.get(), finalOutput));
+            int code = exitCode.get();
+            String finalOutput = outputForCallback != null ? outputForCallback : "";
+            finishHandler.post(() -> processListener.onProcessFinished(code, finalOutput));
         }
 
         // 6. Cleanup referensi
