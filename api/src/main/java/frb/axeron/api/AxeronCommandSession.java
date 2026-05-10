@@ -118,6 +118,7 @@ public class AxeronCommandSession {
     private void startNewProcess(String command, boolean isCompatModeEnabled) {
         destroy(); // bersihkan jika ada
         exitCode.set(0);
+        pid.set(-1);
 
         process = Axeron.newProcess(getQuickCmd(
                         command,
@@ -143,7 +144,11 @@ public class AxeronCommandSession {
                         outputHandler.post(() -> resultListener.output(part));
                     }
                 }
-            } catch (IOException | RuntimeException e) {
+            } catch (IOException e) {
+                if (isProcessRunning.get()) {
+                    errorListener("stdout: " + e.getMessage());
+                }
+            } catch (RuntimeException e) {
                 errorListener("stdout: " + e.getMessage());
             }
         }, "SessionOutThread");
@@ -158,13 +163,13 @@ public class AxeronCommandSession {
                     Log.d("CmdOut", "error: " + finalLine);
                     Log.d("CmdOut", "isProcess: " + isProcessRunning.get());
 
-                    // Jika bukan PID, teruskan ke error handler
-                    if (!isProcessRunning.get() && finalLine.trim().matches("^\\d+$")) {
-                        pid.set(Integer.parseInt(finalLine.trim()));
-                        Log.d("CmdOut", "pid: " + pid.get());
-                        isProcessRunning.set(true);
-                        if (processListener != null) {
-                            mainHandler.post(() -> processListener.onProcessCreated(pid.get(), command));
+                    // Detect PID from first line of stderr
+                    if (finalLine.trim().matches("^\\d+$")) {
+                        if (pid.compareAndSet(-1, Integer.parseInt(finalLine.trim()))) {
+                            Log.d("CmdOut", "pid: " + pid.get());
+                            if (processListener != null) {
+                                mainHandler.post(() -> processListener.onProcessCreated(pid.get(), command));
+                            }
                         }
                         continue;
                     }
@@ -174,7 +179,11 @@ public class AxeronCommandSession {
                     }
 
                 }
-            } catch (IOException | RuntimeException e) {
+            } catch (IOException e) {
+                if (isProcessRunning.get()) {
+                    errorListener("stderr: " + e.getMessage());
+                }
+            } catch (RuntimeException e) {
                 errorListener("stderr: " + e.getMessage());
             }
         }, "SessionErrThread");
@@ -195,6 +204,7 @@ public class AxeronCommandSession {
 
         }, "SessionWaitThread");
 
+        isProcessRunning.set(true);
         outThread.start();
         errThread.start();
         waitThread.start();
@@ -217,24 +227,26 @@ public class AxeronCommandSession {
 
     public synchronized void destroy() {
         String outputForCallback = null;
+        boolean wasRunning = isProcessRunning.getAndSet(false);
+
         try {
-            // 1. Pastikan proses dihentikan dulu (sinyal soft kill)
-            if (process != null) process.destroy();
+            // 1. Interrupt threads as a signal to stop
+            if (outThread != null) outThread.interrupt();
+            if (errThread != null) errThread.interrupt();
+            if (waitThread != null && waitThread != Thread.currentThread()) waitThread.interrupt();
 
-            // 2. Tunggu stream selesai dibaca (dari waitThread → pakai .join)
-            //    -> jangan close reader dulu, tunggu dari luar
-
-            // 3. Tutup semua stream SETELAH thread selesai
+            // 2. Close stdin writer (always safe)
             if (writer != null) writer.close();
+
+            // 3. Close readers — unblocks blocked read() calls.
+            //    Reader threads check isProcessRunning and suppress the IOException
             if (bufferedReader != null) bufferedReader.close();
             if (bufferedError != null) bufferedError.close();
 
-            // 4. Optional: kalau masih ada thread aktif, interrupt (fallback)
-            if (outThread != null && outThread.isAlive()) outThread.interrupt();
-            if (errThread != null && errThread.isAlive()) errThread.interrupt();
-            if (waitThread != null && waitThread.isAlive()) waitThread.interrupt();
+            // 4. Kill the OS process
+            if (process != null) process.destroy();
 
-            // 5. Get output for callback, then clear cached output to free memory
+            // 5. Capture last output for callback
             outputForCallback = lastOutput.get();
             lastOutput.set(null);
 
@@ -242,14 +254,13 @@ public class AxeronCommandSession {
             errorListener("destroy: " + e.getMessage());
         }
 
-        if (isProcessRunning.get() && processListener != null) {
+        if (wasRunning && processListener != null) {
             int code = exitCode.get();
             String finalOutput = outputForCallback != null ? outputForCallback : "";
             finishHandler.post(() -> processListener.onProcessFinished(code, finalOutput));
         }
 
-        // 6. Cleanup referensi
-        isProcessRunning.set(false);
+        // 6. Cleanup references
         writer = null;
         bufferedReader = null;
         bufferedError = null;
