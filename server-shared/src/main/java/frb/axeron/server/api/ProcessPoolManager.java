@@ -49,6 +49,16 @@ public class ProcessPoolManager {
         return acquireProcess(label, defaultTimeoutMs);
     }
 
+    public void acquireProcessBlocking(String label) {
+        try {
+            semaphore.acquire();
+            Log.d(TAG, "Acquired process slot for: " + label + " (" + getActiveCount() + "/" + maxConcurrent + ")");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Log.w(TAG, "Interrupted while acquiring process slot for: " + label);
+        }
+    }
+
     public boolean acquireProcess(String label, long timeoutMs) {
         try {
             if (semaphore.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS)) {
@@ -75,6 +85,10 @@ public class ProcessPoolManager {
     }
 
     public void releaseProcess(Process process) {
+        if (!activeProcesses.containsKey(process)) {
+            Log.w(TAG, "releaseProcess called for untracked process, ignoring");
+            return;
+        }
         activeProcesses.remove(process);
         semaphore.release();
         Log.d(TAG, "Released process slot. Active: " + getActiveCount() + "/" + maxConcurrent);

@@ -91,6 +91,7 @@ public class RemoteProcessHolder extends IRemoteProcess.Stub {
     @Override
     public void destroy() {
         process.destroy();
+        ProcessPoolManager.getInstance().releaseProcess(process);
     }
 
     @Override

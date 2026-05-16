@@ -110,7 +110,10 @@ public class AxeronCommandSession {
 
     public void killSession() {
         if (pid.get() > 0) {
-            Axeron.newProcess("kill -TERM " + pid.get());
+            // Kill the entire process group (negative pid = pgid).
+            // setsid was used, so the shell is the process group leader
+            // and pgid == pid.  SIGKILL is uncatchable.
+            Axeron.newProcess("kill -KILL -- -" + pid.get());
         }
         destroy();
     }

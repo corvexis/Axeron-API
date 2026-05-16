@@ -33,6 +33,9 @@ public class AxeronSettings {
     public static final String ENABLE_IGNITE_RELOG = "enable_ignite_relog";
     public static final String LANGUAGE = "language";
     public static final String ENABLE_START_ON_BOOT = "enable_start_on_boot";
+    public static final String ENABLE_AUTO_RESTART = "enable_auto_restart";
+    public static final String SYSTEM_FONT = "system_font";
+    public static final String FONT_CHOICE = "font_choice";
 
     private static SharedPreferences sPreferences;
 
@@ -164,6 +167,16 @@ public class AxeronSettings {
         getPreferences().edit().putBoolean(ENABLE_START_ON_BOOT, method).apply();
     }
 
+    // AUTO RESTART
+
+    public static boolean getEnableAutoRestart() {
+        return getPreferences().getBoolean(ENABLE_AUTO_RESTART, true);
+    }
+
+    public static void setEnableAutoRestart(boolean enable) {
+        getPreferences().edit().putBoolean(ENABLE_AUTO_RESTART, enable).apply();
+    }
+
     //PRIMARY COLOR
 
     @Nullable
@@ -185,6 +198,26 @@ public class AxeronSettings {
             return Locale.getDefault();
         }
         return Locale.forLanguageTag(tag);
+    }
+
+    // SYSTEM FONT
+
+    public static boolean getSystemFont() {
+        return getPreferences().getBoolean(SYSTEM_FONT, false);
+    }
+
+    public static void setSystemFont(boolean enable) {
+        getPreferences().edit().putBoolean(SYSTEM_FONT, enable).apply();
+    }
+
+    // FONT CHOICE
+
+    public static String getFontChoice() {
+        return getPreferences().getString(FONT_CHOICE, "jetbrains_mono");
+    }
+
+    public static void setFontChoice(String choice) {
+        getPreferences().edit().putString(FONT_CHOICE, choice).apply();
     }
 
     @IntDef({
