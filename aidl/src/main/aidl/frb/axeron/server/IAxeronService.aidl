@@ -32,6 +32,7 @@ interface IAxeronService {
     boolean shouldShowRequestPermissionRationale() = 21;
     void attachApplication(in IShizukuApplication application,in Bundle args) = 22;
     IRemoteProcess newProcess(in String[] cmd, in String[] env, in String dir) = 23;
+    IRemoteProcess newProcessDetached(in String[] cmd, in String[] env, in String dir) = 24;
     void attachUserService(in IBinder binder, in Bundle options) = 101;
     oneway void dispatchPackageChanged(in Intent intent) = 102;
     oneway void dispatchPermissionConfirmationResult(int requestUid, int requestPid, int requestCode, in Bundle data) = 104;

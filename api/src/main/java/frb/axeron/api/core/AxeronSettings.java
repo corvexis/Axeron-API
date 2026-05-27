@@ -34,6 +34,7 @@ public class AxeronSettings {
     public static final String LANGUAGE = "language";
     public static final String ENABLE_START_ON_BOOT = "enable_start_on_boot";
     public static final String ENABLE_AUTO_RESTART = "enable_auto_restart";
+    public static final String WAS_RUNNING = "was_running";
     public static final String SYSTEM_FONT = "system_font";
     public static final String FONT_CHOICE = "font_choice";
 
@@ -175,6 +176,16 @@ public class AxeronSettings {
 
     public static void setEnableAutoRestart(boolean enable) {
         getPreferences().edit().putBoolean(ENABLE_AUTO_RESTART, enable).apply();
+    }
+
+    // WAS RUNNING
+
+    public static boolean getWasRunning() {
+        return getPreferences().getBoolean(WAS_RUNNING, false);
+    }
+
+    public static void setWasRunning(boolean wasRunning) {
+        getPreferences().edit().putBoolean(WAS_RUNNING, wasRunning).apply();
     }
 
     //PRIMARY COLOR

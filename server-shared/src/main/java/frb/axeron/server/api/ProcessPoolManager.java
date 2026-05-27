@@ -75,8 +75,14 @@ public class ProcessPoolManager {
     }
 
     public void registerProcess(Process process) {
+        registerProcess(process, defaultTimeoutMs);
+    }
+
+    public void registerProcess(Process process, long timeoutMs) {
         activeProcesses.put(process, System.currentTimeMillis());
-        scheduleTimeoutCheck(process);
+        if (timeoutMs > 0) {
+            scheduleTimeoutCheck(process, timeoutMs);
+        }
     }
 
     public void cancelAcquire() {
@@ -145,11 +151,11 @@ public class ProcessPoolManager {
         }
     }
 
-    private void scheduleTimeoutCheck(final Process process) {
+    private void scheduleTimeoutCheck(final Process process, long timeoutMs) {
         timeoutHandler.postDelayed(() -> {
             if (activeProcesses.containsKey(process)) {
                 long elapsed = System.currentTimeMillis() - activeProcesses.get(process);
-                if (elapsed > defaultTimeoutMs) {
+                if (elapsed > timeoutMs) {
                     Log.w(TAG, "Process timed out after " + elapsed + "ms");
                     try {
                         process.destroy();
@@ -158,6 +164,6 @@ public class ProcessPoolManager {
                     releaseProcess(process);
                 }
             }
-        }, defaultTimeoutMs);
+        }, timeoutMs);
     }
 }

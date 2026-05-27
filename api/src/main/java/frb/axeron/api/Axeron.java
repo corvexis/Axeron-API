@@ -376,7 +376,25 @@ public class Axeron {
 //            Log.d(TAG, "Failed to execute command", e);
             throw new RuntimeException("Failed to execute command", e);
         }
-    }    private static final IBinder.DeathRecipient DEATH_RECIPIENT = () -> {
+    }
+
+    public static AxeronNewProcess newProcessDetached(@NonNull String[] cmd, @Nullable Environment env, @Nullable String dir) {
+        try {
+            return new AxeronNewProcess(requireService().newProcessDetached(cmd, env != null ? env.getEnv() : null, dir));
+        } catch (RemoteException | NullPointerException e) {
+            throw new RuntimeException("Failed to execute detached command", e);
+        }
+    }
+
+    public static AxeronNewProcess newProcessDetached(@NonNull String cmd) {
+        return newProcessDetached(new String[]{"sh", "-c", cmd});
+    }
+
+    public static AxeronNewProcess newProcessDetached(@NonNull String[] cmd) {
+        return newProcessDetached(cmd, Axeron.getEnvironment(TYPE_ENV), null);
+    }
+
+    private static final IBinder.DeathRecipient DEATH_RECIPIENT = () -> {
         binderReady = false;
         onBinderReceived(null, null);
     };

@@ -219,7 +219,7 @@ object AxeronPluginService {
 
         Log.d(TAG, "execWithIO: $cmd")
 
-        val process = Axeron.newProcess(
+        val process = Axeron.newProcessDetached(
             if (useSetsid) arrayOf(BUSYBOX, "setsid", "sh")
             else arrayOf(BUSYBOX, "sh"),
             Axeron.getEnvironment(),

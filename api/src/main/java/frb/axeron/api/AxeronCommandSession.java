@@ -11,6 +11,8 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -123,6 +125,8 @@ public class AxeronCommandSession {
         exitCode.set(0);
         pid.set(-1);
 
+        CountDownLatch pidLatch = new CountDownLatch(1);
+
         process = Axeron.newProcess(getQuickCmd(
                         command,
                         isCompatModeEnabled,
@@ -136,6 +140,9 @@ public class AxeronCommandSession {
 
         outThread = new Thread(() -> {
             try {
+                // Wait for PID to be detected from stderr before emitting any output
+                pidLatch.await(2, TimeUnit.SECONDS);
+
                 char[] buffer = new char[1024 * 2];
                 int bytesRead;
 
@@ -147,6 +154,8 @@ public class AxeronCommandSession {
                         outputHandler.post(() -> resultListener.output(part));
                     }
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (IOException e) {
                 if (isProcessRunning.get()) {
                     errorListener("stdout: " + e.getMessage());
@@ -170,6 +179,8 @@ public class AxeronCommandSession {
                     if (finalLine.trim().matches("^\\d+$")) {
                         if (pid.compareAndSet(-1, Integer.parseInt(finalLine.trim()))) {
                             Log.d("CmdOut", "pid: " + pid.get());
+                            // Signal that PID has been detected before posting callback
+                            pidLatch.countDown();
                             if (processListener != null) {
                                 mainHandler.post(() -> processListener.onProcessCreated(pid.get(), command));
                             }
