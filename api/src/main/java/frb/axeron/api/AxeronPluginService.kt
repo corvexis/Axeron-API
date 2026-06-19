@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import frb.axeron.api.core.AxeronSettings
 import frb.axeron.api.core.Engine.Companion.application
@@ -170,27 +171,44 @@ object AxeronPluginService {
                     "module.zip"
                 )
 
-            val fos = axFS.getStreamSession(file.absolutePath, true, false).outputStream
-
-            val buffer = ByteArray(8 * 1024)
-            var bytesRead: Int
-            while (this?.read(buffer).also {
-                    bytesRead = it!!
-                } != -1) {
-                fos.write(buffer, 0, bytesRead)
+            val session = axFS.getStreamSession(file.absolutePath, true, false)
+            if (session == null) {
+                this?.close()
+                return FlashResult(-1, "Cannot open file for writing", false)
             }
-            fos.flush()
-            this?.close()
 
-            val cmd =
-                "ZIPFILE=${file.absolutePath}; . functions.sh; install_plugin ${installer.autoEnable}; exit 0"
-            val result = execWithIO(cmd, onStdout, onStderr, standAlone = true)
+            try {
+                val fos = session.outputStream
 
-            Log.i(TAG, "install module ${installer.uri} result: $result")
+                val buffer = ByteArray(8 * 1024)
+                var bytesRead: Int
+                while (this?.read(buffer).also {
+                        bytesRead = it!!
+                    } != -1) {
+                    fos.write(buffer, 0, bytesRead)
+                }
+                fos.flush()
+                this?.close()
 
-            axFS.delete(file.absolutePath)
+                val validation = validatePluginZip(file.absolutePath, onStdout, onStderr)
+                if (!validation.pass) {
+                    axFS.delete(file.absolutePath)
+                    onStderr("@@GIMMICK_GUARD_REJECTED@@=${validation.reason}\n")
+                    return FlashResult(-2, validation.reason, false)
+                }
 
-            return FlashResult(result)
+                val cmd =
+                    "ZIPFILE=${file.absolutePath}; . functions.sh; install_plugin ${installer.autoEnable}; exit 0"
+                val result = execWithIO(cmd, onStdout, onStderr, standAlone = true)
+
+                Log.i(TAG, "install module ${installer.uri} result: $result")
+
+                axFS.delete(file.absolutePath)
+
+                return FlashResult(result)
+            } finally {
+                session.close()
+            }
         }
     }
 
@@ -741,4 +759,239 @@ object AxeronPluginService {
         }
     }
 
+    //===================================
+    // GIMMICK GUARD
+    //===================================
+
+    data class ValidationResult(
+        val pass: Boolean = true,
+        val isTrusted: Boolean = false,
+        val reason: String = ""
+    )
+
+    private data class ModuleProp(
+        val name: String = "",
+        val author: String = "",
+        val version: String = "",
+        val id: String = ""
+    )
+
+    private data class GimmickGuardConfig(
+        @SerializedName("schema_version") val schemaVersion: Int = 1,
+        val updated: String = "",
+        @SerializedName("blocked_authors") val blockedAuthors: List<String> = emptyList(),
+        @SerializedName("blocked_author_patterns") val blockedAuthorPatterns: List<String> = emptyList(),
+        @SerializedName("blocked_module_ids") val blockedModuleIds: List<String> = emptyList(),
+        @SerializedName("trusted_authors") val trustedAuthors: List<String> = emptyList(),
+        @SerializedName("suspicious_patterns") val suspiciousPatterns: List<String> = emptyList()
+    ) {
+        fun isInactive(): Boolean =
+            blockedAuthors.isEmpty() && blockedAuthorPatterns.isEmpty() &&
+                    blockedModuleIds.isEmpty() && suspiciousPatterns.isEmpty()
+    }
+
+    private val gimmickGuardConfig: GimmickGuardConfig by lazy {
+        loadGimmickGuardConfig()
+    }
+
+    private fun loadConfigFromAssets(): GimmickGuardConfig? {
+        return try {
+            val input = application.assets.open("scripts/gimmick_guard.json")
+            val json = input.bufferedReader().use { it.readText() }
+            Gson().fromJson(json, GimmickGuardConfig::class.java)
+        } catch (e: Exception) {
+            Log.w(TAG, "GimmickGuard: assets load failed", e)
+            null
+        }
+    }
+
+    private fun loadConfigFromFilesystem(): GimmickGuardConfig? {
+        return try {
+            val file = File(AXERONBIN, "gimmick_guard.json")
+            if (file.exists()) {
+                val json = file.readText()
+                Gson().fromJson(json, GimmickGuardConfig::class.java)
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "GimmickGuard: filesystem load failed", e)
+            null
+        }
+    }
+
+    private fun mergeConfig(base: GimmickGuardConfig, override: GimmickGuardConfig): GimmickGuardConfig {
+        return GimmickGuardConfig(
+            schemaVersion = override.schemaVersion.takeIf { it != 0 } ?: base.schemaVersion,
+            updated = override.updated.takeIf { it.isNotEmpty() } ?: base.updated,
+            blockedAuthors = (base.blockedAuthors + override.blockedAuthors).distinct(),
+            blockedAuthorPatterns = (base.blockedAuthorPatterns + override.blockedAuthorPatterns).distinct(),
+            blockedModuleIds = (base.blockedModuleIds + override.blockedModuleIds).distinct(),
+            trustedAuthors = (base.trustedAuthors + override.trustedAuthors).distinct(),
+            suspiciousPatterns = (base.suspiciousPatterns + override.suspiciousPatterns).distinct()
+        )
+    }
+
+    private fun loadGimmickGuardConfig(): GimmickGuardConfig {
+        val bundled = loadConfigFromAssets()
+        val userOverride = loadConfigFromFilesystem()
+
+        val config = if (bundled != null && userOverride != null) {
+            mergeConfig(bundled, userOverride)
+        } else {
+            bundled ?: userOverride ?: GimmickGuardConfig()
+        }
+
+        Log.d(TAG, "GimmickGuard: blockedAuth=${config.blockedAuthors.size} patterns=${config.blockedAuthorPatterns.size} suspPatterns=${config.suspiciousPatterns.size} trust=${config.trustedAuthors.size}")
+        if (config.isInactive()) Log.w(TAG, "GimmickGuard: ALL CHECKS DISABLED - no active rules")
+        return config
+    }
+
+    private fun normalizeAuthor(raw: String): String {
+        val nfkc = java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFKC)
+        val homoglyph = mapOf(
+            'Ѕ' to 'S', 'А' to 'A', 'В' to 'B', 'Е' to 'E', 'К' to 'K',
+            'М' to 'M', 'Н' to 'H', 'О' to 'O', 'Р' to 'P', 'С' to 'C',
+            'Т' to 'T', 'У' to 'Y', 'Х' to 'X',
+            'ѕ' to 's', 'а' to 'a', 'в' to 'b', 'е' to 'e', 'к' to 'k',
+            'м' to 'm', 'н' to 'n', 'о' to 'o', 'р' to 'p', 'с' to 'c',
+            'т' to 't', 'у' to 'y', 'х' to 'x'
+        )
+        val translit = nfkc.map { homoglyph[it] ?: it }.joinToString("")
+        val decomposed = java.text.Normalizer.normalize(translit, java.text.Normalizer.Form.NFD)
+        val stripped = decomposed.replace(Regex("[\\p{InCombiningDiacriticalMarks}]"), "")
+        return stripped.lowercase().replace(Regex("[^a-z0-9.@_\\-]"), "")
+    }
+
+    private fun isGimmickTextEntry(name: String): Boolean {
+        val textExts = setOf("sh", "prop", "txt", "cfg", "conf", "ini", "rc", "xml", "json", "yml", "yaml")
+        val dot = name.lastIndexOf('.')
+        if (dot > 0 && dot < name.length - 1) {
+            return name.substring(dot + 1) in textExts
+        }
+        return dot == -1
+    }
+
+    private fun isBinaryBytes(data: ByteArray): Boolean {
+        if (data.size >= 4 && data[0] == 0x7F.toByte() && data[1] == 0x45.toByte() &&
+            data[2] == 0x4C.toByte() && data[3] == 0x46.toByte()) return true
+        if (data.size >= 4 && data[0] == 0x64.toByte() && data[1] == 0x65.toByte() &&
+            data[2] == 0x78.toByte() && data[3] == 0x0A.toByte()) return true
+        for (i in 0 until minOf(data.size, 512)) {
+            if (data[i] == 0.toByte()) return true
+        }
+        return false
+    }
+
+    private fun propToJson(propContent: String): String {
+        val map = mutableMapOf<String, String>()
+        propContent.lines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
+                val eq = trimmed.indexOf('=')
+                if (eq > 0) {
+                    val key = trimmed.substring(0, eq).trim()
+                    val value = trimmed.substring(eq + 1).trim()
+                    map[key] = value
+                }
+            }
+        }
+        return Gson().toJson(map)
+    }
+
+    suspend fun validatePluginZip(
+        zipPath: String,
+        onStdout: (String) -> Unit = {},
+        onStderr: (String) -> Unit = {}
+    ): ValidationResult {
+        val config = gimmickGuardConfig
+
+        Log.d(TAG, "GimmickGuard: validating ZIP - blockedAuthors=${config.blockedAuthors.size} ${config.blockedAuthors.take(3)} suspPatterns=${config.suspiciousPatterns.size}")
+
+        var moduleProp: ModuleProp? = null
+        val textContents = mutableMapOf<String, String>()
+
+        return try {
+            java.util.zip.ZipInputStream(axFS.setFileInputStream(zipPath)).use { zipStream ->
+                var entry = zipStream.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory) {
+                        val name = entry.name
+                        if (name == "module.prop") {
+                            val content = zipStream.bufferedReader().readText()
+                            val json = propToJson(content)
+                            moduleProp = Gson().fromJson(json, ModuleProp::class.java)
+
+                            moduleProp?.let { prop ->
+                                val normalizedAuthor = normalizeAuthor(prop.author)
+                                val normalizedId = normalizeAuthor(prop.id)
+
+                                for (blocked in config.blockedAuthors) {
+                                    val normalizedBlocked = normalizeAuthor(blocked)
+                                    if (normalizedAuthor.contains(normalizedBlocked) || normalizedBlocked.contains(normalizedAuthor)) {
+                                        return@use ValidationResult(false, reason = "Blocked author: ${prop.author}")
+                                    }
+                                }
+
+                                for (patternStr in config.blockedAuthorPatterns) {
+                                    try {
+                                        val pattern = Regex(patternStr, RegexOption.IGNORE_CASE)
+                                        if (pattern.containsMatchIn(normalizedAuthor)) {
+                                            return@use ValidationResult(false, reason = "Blocked author pattern: ${prop.author}")
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+
+                                for (blocked in config.blockedModuleIds) {
+                                    if (normalizeAuthor(blocked) == normalizedId) {
+                                        return@use ValidationResult(false, reason = "Blocked module ID: ${prop.id}")
+                                    }
+                                }
+                            }
+                        } else if (isGimmickTextEntry(name)) {
+                            val baos = java.io.ByteArrayOutputStream(100 * 1024)
+                            val buf = ByteArray(4096)
+                            var total = 0
+                            while (total < 100 * 1024) {
+                                val read = zipStream.read(buf)
+                                if (read <= 0) break
+                                baos.write(buf, 0, read)
+                                total += read
+                            }
+                            val bytes = baos.toByteArray()
+                            if (!isBinaryBytes(bytes)) {
+                                textContents[name] = bytes.toString(Charsets.UTF_8)
+                            }
+                        }
+                    }
+                    zipStream.closeEntry()
+                    entry = zipStream.nextEntry
+                }
+            }
+
+            val prop = moduleProp ?: return ValidationResult(false, reason = "module.prop not found")
+
+            val compiledPatterns = config.suspiciousPatterns.mapNotNull { p ->
+                try { Regex(p, RegexOption.IGNORE_CASE) } catch (_: Exception) { null }
+            }
+            if (compiledPatterns.isNotEmpty()) {
+                for ((fileName, content) in textContents) {
+                    for (pattern in compiledPatterns) {
+                        if (pattern.containsMatchIn(content)) {
+                            return ValidationResult(false, reason = "Suspicious code in $fileName")
+                        }
+                    }
+                }
+            }
+
+            val isTrusted = config.trustedAuthors.any { normalizeAuthor(it) == normalizeAuthor(prop.author) }
+            if (isTrusted) {
+                onStdout("\n@@GIMMICK_SPLASH@@=${prop.name}|${prop.author}|${prop.version}\n")
+            }
+
+            ValidationResult(pass = true, isTrusted = isTrusted)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "GimmickGuard validation error", e)
+            ValidationResult(pass = false, reason = "Validation error: ${e.message}")
+        }
+    }
 }
