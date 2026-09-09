@@ -39,5 +39,6 @@ interface IAxeronService {
     int getFlagsForUid(int uid, int mask) = 105;
     void updateFlagsForUid(int uid, int mask, int value) = 106;
     int checkPermission(String permission) = 107;
+    void softReboot() = 108;
     void exit() = 16777114;
 }

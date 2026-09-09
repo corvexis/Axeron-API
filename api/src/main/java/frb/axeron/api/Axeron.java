@@ -509,6 +509,14 @@ public class Axeron {
         return AxeronApiConstant.server.VERSION_CODE <= Axeron.getAxeronInfo().getServerInfo().getVersionCode();
     }
 
+    public static void softReboot() {
+        try {
+            requireService().softReboot();
+        } catch (RemoteException e) {
+            throw rethrowAsRuntimeException(e);
+        }
+    }
+
     public interface OnBinderReceivedListener {
         void onBinderReceived();
     }

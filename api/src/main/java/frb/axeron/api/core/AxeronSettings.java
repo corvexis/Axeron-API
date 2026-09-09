@@ -30,6 +30,13 @@ public class AxeronSettings {
     public static final String ENABLE_DEVELOPER_OPTIONS = "enable_developer_options";
     public static final String ENABLE_WEB_DEBUGGING = "enable_web_debugging";
     public static final String CUSTOM_PRIMARY_COLOR = "custom_primary_color";
+    public static final String CUSTOM_SECONDARY_COLOR = "custom_secondary_color";
+    public static final String CUSTOM_TERTIARY_COLOR = "custom_tertiary_color";
+    public static final String AMOLED_MODE = "amoled_mode";
+    public static final String CORNER_STYLE = "corner_style";
+    public static final String ACCENT_INTENSITY = "accent_intensity";
+    public static final String BOTTOM_BAR_SCALE = "bottom_bar_scale";
+    public static final String HOME_BANNER = "home_banner";
     public static final String ENABLE_IGNITE_RELOG = "enable_ignite_relog";
     public static final String LANGUAGE = "language";
     public static final String ENABLE_START_ON_BOOT = "enable_start_on_boot";
@@ -201,6 +208,91 @@ public class AxeronSettings {
 
     public static void removePrimaryColor() {
         getPreferences().edit().remove(CUSTOM_PRIMARY_COLOR).apply();
+    }
+
+    // SECONDARY COLOR
+
+    @Nullable
+    public static String getCustomSecondaryColor() {
+        return getPreferences().getString(CUSTOM_SECONDARY_COLOR, null);
+    }
+
+    public static void setSecondaryColor(String hex) {
+        getPreferences().edit().putString(CUSTOM_SECONDARY_COLOR, hex).apply();
+    }
+
+    public static void removeSecondaryColor() {
+        getPreferences().edit().remove(CUSTOM_SECONDARY_COLOR).apply();
+    }
+
+    // TERTIARY COLOR
+
+    @Nullable
+    public static String getCustomTertiaryColor() {
+        return getPreferences().getString(CUSTOM_TERTIARY_COLOR, null);
+    }
+
+    public static void setTertiaryColor(String hex) {
+        getPreferences().edit().putString(CUSTOM_TERTIARY_COLOR, hex).apply();
+    }
+
+    public static void removeTertiaryColor() {
+        getPreferences().edit().remove(CUSTOM_TERTIARY_COLOR).apply();
+    }
+
+    // AMOLED MODE
+
+    public static boolean getAmoledMode() {
+        return getPreferences().getBoolean(AMOLED_MODE, false);
+    }
+
+    public static void setAmoledMode(boolean enable) {
+        getPreferences().edit().putBoolean(AMOLED_MODE, enable).apply();
+    }
+
+    // CORNER STYLE
+
+    public static int getCornerStyle() {
+        return getPreferences().getInt(CORNER_STYLE, 0);
+    }
+
+    public static void setCornerStyle(int style) {
+        getPreferences().edit().putInt(CORNER_STYLE, style).apply();
+    }
+
+    // ACCENT INTENSITY
+
+    public static float getAccentIntensity() {
+        return getPreferences().getFloat(ACCENT_INTENSITY, 1.0f);
+    }
+
+    public static void setAccentIntensity(float intensity) {
+        getPreferences().edit().putFloat(ACCENT_INTENSITY, intensity).apply();
+    }
+
+    // BOTTOM BAR SCALE
+
+    public static float getBottomBarScale() {
+        return getPreferences().getFloat(BOTTOM_BAR_SCALE, 1.0f);
+    }
+
+    public static void setBottomBarScale(float scale) {
+        getPreferences().edit().putFloat(BOTTOM_BAR_SCALE, scale).apply();
+    }
+
+    // HOME BANNER
+
+    @Nullable
+    public static String getHomeBanner() {
+        return getPreferences().getString(HOME_BANNER, null);
+    }
+
+    public static void setHomeBanner(String path) {
+        getPreferences().edit().putString(HOME_BANNER, path).apply();
+    }
+
+    public static void removeHomeBanner() {
+        getPreferences().edit().remove(HOME_BANNER).apply();
     }
 
     public static Locale getLocale() {
