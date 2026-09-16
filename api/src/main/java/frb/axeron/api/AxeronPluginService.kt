@@ -190,11 +190,13 @@ object AxeronPluginService {
                 fos.flush()
                 this?.close()
 
-                val validation = validatePluginZip(file.absolutePath, onStdout, onStderr)
-                if (!validation.pass) {
-                    axFS.delete(file.absolutePath)
-                    onStderr("@@GIMMICK_GUARD_REJECTED@@=${validation.reason}\n")
-                    return FlashResult(-2, validation.reason, false)
+                if (AxeronSettings.getGimmickGuardEnabled()) {
+                    val validation = validatePluginZip(file.absolutePath, onStdout, onStderr)
+                    if (!validation.pass) {
+                        axFS.delete(file.absolutePath)
+                        onStderr("@@GIMMICK_GUARD_REJECTED@@=${validation.reason}\n")
+                        return FlashResult(-2, validation.reason, false)
+                    }
                 }
 
                 val cmd =

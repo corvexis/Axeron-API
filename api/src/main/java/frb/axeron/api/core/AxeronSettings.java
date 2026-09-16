@@ -44,6 +44,7 @@ public class AxeronSettings {
     public static final String WAS_RUNNING = "was_running";
     public static final String SYSTEM_FONT = "system_font";
     public static final String FONT_CHOICE = "font_choice";
+    public static final String ENABLE_GIMMICK_GUARD = "enable_gimmick_guard";
 
     private static SharedPreferences sPreferences;
 
@@ -321,6 +322,16 @@ public class AxeronSettings {
 
     public static void setFontChoice(String choice) {
         getPreferences().edit().putString(FONT_CHOICE, choice).apply();
+    }
+
+    // GIMMICK GUARD
+
+    public static boolean getGimmickGuardEnabled() {
+        return getPreferences().getBoolean(ENABLE_GIMMICK_GUARD, true);
+    }
+
+    public static void setGimmickGuardEnabled(boolean enable) {
+        getPreferences().edit().putBoolean(ENABLE_GIMMICK_GUARD, enable).apply();
     }
 
     @IntDef({
