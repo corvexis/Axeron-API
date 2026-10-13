@@ -265,6 +265,25 @@ public class Axeron {
     public static void onBinderReceived(IBinder newBinder, String packageName) {
         if (binder == newBinder) return;
 
+        if (newBinder != null) {
+            // Only ever accept an IAxeronService binder. The push path has multiple producers,
+            // and a wrong one (notably the Shizuku intercept binder when AX-Scope is enabled)
+            // used to be stored here as if it were IAxeronService: every call then failed with
+            // SecurityException("Binder invocation to an incorrect interface"), and - worse -
+            // it replaced a perfectly good binder the app already held, so a working connection
+            // regressed to "Need to Activate". Rejecting the mismatch here keeps a bad push from
+            // ever doing damage.
+            try {
+                String descriptor = newBinder.getInterfaceDescriptor();
+                if (descriptor != null && !IAxeronService.DESCRIPTOR.equals(descriptor)) {
+                    Log.w(TAG, "Ignoring binder with unexpected interface: " + descriptor);
+                    return;
+                }
+            } catch (Throwable e) {
+                Log.w(TAG, "Failed to read binder interface; accepting anyway", e);
+            }
+        }
+
         if (newBinder == null) {
             cancelHealthCheck();
             binder = null;
@@ -320,7 +339,10 @@ public class Axeron {
         try {
             if (service == null) return null;
             return service.getShizukuService();
-        } catch (RemoteException e) {
+        } catch (Exception e) {
+            // A stale/incompatible server rejects the transaction with a SecurityException
+            // ("Binder invocation to an incorrect interface"), which is not a RemoteException
+            // and would otherwise escape to callers - crashing the app during startup.
             Log.e(TAG, "getShizukuService", e);
             return null;
         }
