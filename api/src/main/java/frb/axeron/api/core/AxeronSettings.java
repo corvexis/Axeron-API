@@ -36,6 +36,7 @@ public class AxeronSettings {
     public static final String CORNER_STYLE = "corner_style";
     public static final String ACCENT_INTENSITY = "accent_intensity";
     public static final String BOTTOM_BAR_SCALE = "bottom_bar_scale";
+    public static final String UI_SCALE = "ui_scale";
     public static final String HOME_BANNER = "home_banner";
     public static final String ENABLE_IGNITE_RELOG = "enable_ignite_relog";
     public static final String LANGUAGE = "language";
@@ -279,6 +280,16 @@ public class AxeronSettings {
 
     public static void setBottomBarScale(float scale) {
         getPreferences().edit().putFloat(BOTTOM_BAR_SCALE, scale).apply();
+    }
+
+    // UI SCALE
+
+    public static float getUiScale() {
+        return getPreferences().getFloat(UI_SCALE, 1.0f);
+    }
+
+    public static void setUiScale(float scale) {
+        getPreferences().edit().putFloat(UI_SCALE, scale).apply();
     }
 
     // HOME BANNER

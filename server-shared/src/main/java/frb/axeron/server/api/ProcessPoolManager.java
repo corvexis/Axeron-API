@@ -104,6 +104,22 @@ public class ProcessPoolManager {
         return activeProcesses.size();
     }
 
+    public boolean isAnyProcessAlive() {
+        boolean any = false;
+        java.util.Iterator<Map.Entry<Process, Long>> it = activeProcesses.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Process, Long> entry = it.next();
+            if (entry.getKey().isAlive()) {
+                any = true;
+            } else {
+                it.remove();
+                semaphore.release();
+                Log.d(TAG, "Reaped dead process. Active: " + getActiveCount() + "/" + maxConcurrent);
+            }
+        }
+        return any;
+    }
+
     public int getAvailableSlots() {
         return semaphore.availablePermits();
     }
